@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/favicon.png">
+    <title>Crotale - a web application for loudness</title>
+    <link rel="stylesheet" href="/static/crotale.css">
+</head>
+<body>
+    <div class="text-container">
+        <div class="text-content">
+            <h1>Crotale</h1>
+            <p>an EBU R128 loudness correction web application, inspired by
+                <a href="https://github.com/kylophone/xylo">Xylo</a></p>
+            <hr>
+            <h4 id="itemStatus">{{ item.status }}</h4>
+            <div class="progress-bar">
+                <span class="meter" style="width: 10%"></span>
+            </div>
+            <table class="table-minimal" id="lufstable">
+              <tbody>
+                <tr>
+                  <td>File:</td>
+                  <td id="filename">{{ item.originalname }}</td>
+                </tr>
+                <tr>
+                  <td>I:</td>
+                  <td id="ilufs">{{ item.ilufs }}</td>
+                </tr>
+                <tr>
+                  <td>I Threshold:</td>
+                  <td id="ithresh">{{ item.ithresh }}</td>
+                </tr>
+                <tr>
+                  <td>LRA:</td>
+                  <td id="lra">{{ item.lra }}</td>
+                </tr>
+                <tr>
+                  <td>LRA Threshold:</td>
+                  <td id="lrathresh">{{ item.lrathresh }}</td>
+                </tr>
+                <tr>
+                  <td>LRA High:</td>
+                  <td id="lrahigh">{{ item.lrahigh }}</td>
+                </tr>
+                <tr>
+                  <td>LRA Low:</td>
+                  <td id="lralow">{{ item.lralow }}</td>
+                </tr>
+                <tr>
+                  <td>Gain Applied:</td>
+                  <td id="gainapplied">{{ item.gainapplied }} dB</td>
+                </tr>
+              </tbody>
+            </table>
+            <div id="downloadLinks">
+                <a id="correctedLink" href="{{ item.outpath }}" download="{{ item.originalname }}">
+                    <button>Download corrected file</button></a>
+                <p class="anotherFile"><a href="/">Click here to process another file.</a></p>
+            </div>
+        </div>
+    </div>
+    <script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+    <script>
+    function updateLufsTable(json) {
+        $('#ilufs').html(json.ilufs);
+        $('#ithresh').html(json.ithresh);
+        $('#lra').html(json.lra);
+        $('#lrathresh').html(json.lrathresh);
+        $('#lrahigh').html(json.lrahigh);
+        $('#lralow').html(json.lralow);
+        $('#gainapplied').html(json.gainapplied + ' dB');
+    }
+    function checkStatus() {
+        console.log('checking status...');
+        $.getJSON("/jsonstatus/{{ item.id }}", function(json) {
+            $('#itemStatus').html(json.status);
+            if (json.status == 'calculating average loudness') {
+                $('.progress-bar').show();
+                $('.meter').attr('style', 'width: 33%');
+                $('#lufstable').hide();
+                $('#downloadLinks').hide();
+            }
+            if (json.status == 'applying gain') {
+                $('.progress-bar').show();
+                $('.meter').attr('style', 'width: 66%');
+                $('#lufstable').show();
+                $('#downloadLinks').hide();
+                updateLufsTable(json);
+            }
+            if (json.status == 'Loudness processing complete.') {
+                $('.progress-bar').hide();
+                $('#lufstable').show();
+                $('#downloadLinks').show();
+                updateLufsTable(json);
+                $('#correctedLink').attr('href', json.outpath);
+                $('#correctedLink').attr('download', json.originalname);
+            }
+            if (json.status == 'not found') {
+                $('.progress-bar').hide();
+                $('#lufstable').hide();
+                $('#downloadLinks').hide();
+            }
+        });
+        if ($('#itemStatus').html() != 'Loudness processing complete.'){
+            return false;
+        } else {
+            return true;
+        }
+    }
+    $( document ).ready(function() {
+        $('#lufstable').hide();
+        $('#downloadLinks').hide();
+        setInterval("checkStatus();", 1000);
+    });
+    </script>
+</body>
+</html>

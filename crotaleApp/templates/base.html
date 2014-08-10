@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/static/favicon.png">
+    <title>Crotale - a web application for loudness</title>
+    <link rel="stylesheet" href="/static/crotale.css">
+</head>
+<body>
+    <div class="text-container">
+        <div class="text-content">
+            <h1>Crotale</h1>
+            <p>an EBU R128 loudness correction web application, inspired by
+                <a href="https://github.com/kylophone/xylo">Xylo</a></p>
+            <fieldset>
+                <form  method="POST" enctype="multipart/form-data" action="/uploadaudio">
+                        <label for="inputFile">Upload an audio file to get started.</label>
+                        <input type="file" id="inputFile" name="audiofile">
+                        <button type="submit">Upload</button>
+                </form>
+            </fieldset>
+        </div>
+    </div>
+</body>
+</html>
