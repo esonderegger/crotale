@@ -20,10 +20,12 @@ Soon, it will hopefully also provide an interface to create watch folders, where
 Installation
 ------------
 
-The easiest way to install Crotale is to use the virtual appliance file (coming soon). To use it, download and install [VirtualBox](https://www.virtualbox.org/wiki/Downloads) on a machine on your network, then inside virtualbox, go to "file -> import appliance" and select the crotale.ova file you just downloaded. After the appliance is set up, click "start" to start the crotale server.
+The easiest way to install Crotale is to use the [virtual appliance file](https://s3-us-west-2.amazonaws.com/crotale/crotale-latest.ova). To use it, download and install [VirtualBox](https://www.virtualbox.org/wiki/Downloads) on a machine on your network, then inside virtualbox, go to "file -> import appliance" and select the crotale-latest.ova file you just downloaded. After the appliance is set up, click "start" to start the crotale server.
 
-The second easiest way to install crotale is to create a virtual machine in VirtualBox and install [Ubuntu Server 14.04](http://www.ubuntu.com/download/server) on it. Have the default user be "crotale". Then, download the [crotale source code](https://github.com/esonderegger/crotale/archive/master.zip) into the home directory, unzip it, and then type:
+The second easiest way to install crotale is to create a virtual machine in VirtualBox and install [Ubuntu Server 14.04](http://www.ubuntu.com/download/server) on it. Have the default user be "crotale". Then, download the [crotale source code](https://s3-us-west-2.amazonaws.com/crotale/crotale-latest.tar.gz) into the home directory, uncompress it, and install it by typing:
 
+    wget https://s3-us-west-2.amazonaws.com/crotale/crotale-latest.tar.gz
+    tar -zxvf crotale-latest.tar.gz
     ./instalScript.sh
 
 You will be prompted for the password you created for the crotale user.
