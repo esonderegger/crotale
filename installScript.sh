@@ -1,5 +1,5 @@
 sudo apt-get install git nginx-full uwsgi uwsgi-plugin-python postgresql python-pip python-sqlalchemy python-psycopg2
-sudo pip install flask watchdog
+sudo pip install flask watchdog pexpect
 
 wget http://ffmpeg.gusari.org/static/64bit/ffmpeg.static.64bit.latest.tar.gz
 tar -zxvf ffmpeg.static.64bit.latest.tar.gz

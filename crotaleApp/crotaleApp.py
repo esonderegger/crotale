@@ -4,7 +4,9 @@ from werkzeug import secure_filename
 from sqlalchemy import create_engine, Column, Integer, Text, Float, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.dialects import postgresql
 import datetime
+import pexpect
 import os
 import subprocess
 import thread
@@ -24,49 +26,93 @@ class AudioFile(alchemyBase):
     originalname = Column(Text)
     inpath = Column(Text)
     outpath = Column(Text)
+    duration = Column(Float)
+    momentarylufs = Column(postgresql.ARRAY(Float))
+    shorttermlufs = Column(postgresql.ARRAY(Float))
     ilufs = Column(Float)
     ithresh = Column(Float)
     lra = Column(Float)
     lrathresh = Column(Float)
     lralow = Column(Float)
     lrahigh = Column(Float)
+    peakdbfs = Column(Float)
     starttime = Column(DateTime)
     endtime = Column(DateTime)
+    goallufs = Column(Float)
+    gainapplied = Column(Float)
     status = Column(Text)
     __tablename__ = 'AudioFile'
 
     def __init__(self, filename):
         self.originalname = filename
+        self.momentarylufs = []
+        self.shorttermlufs = []
+        self.peakdbfs = -1000.0
         self.starttime = datetime.datetime.now()
         self.status = 'uploading'
 
 
-def r128Stats(filePath):
-    """ takes a path to an audio file, returns a dict with the loudness
-    stats computed by the ffmpeg ebur128 filter """
-    ffargs = ['/usr/local/bin/ffmpeg',
-              '-nostats',
+def r128Stats(filePath, dbRow):
+    ffcmd = '/usr/local/bin/ffmpeg'
+    ffargs = ['-nostats',
               '-i',
               filePath,
               '-filter_complex',
-              'ebur128',
+              'ebur128=peak=true',
               '-f',
               'null',
               '-']
-    proc = subprocess.Popen(ffargs, stderr=subprocess.PIPE)
-    stats = proc.communicate()[1]
-    summaryIndex = stats.rfind('Summary:')
-    summaryList = stats[summaryIndex:].split()
-    ILufs = float(summaryList[summaryList.index('I:') + 1])
-    IThresh = float(summaryList[summaryList.index('I:') + 4])
-    LRA = float(summaryList[summaryList.index('LRA:') + 1])
-    LRAThresh = float(summaryList[summaryList.index('LRA:') + 4])
-    LRALow = float(summaryList[summaryList.index('low:') + 1])
-    LRAHigh = float(summaryList[summaryList.index('high:') + 1])
-    statsDict = {'I': ILufs, 'I Threshold': IThresh, 'LRA': LRA,
-                 'LRA Threshold': LRAThresh, 'LRA Low': LRALow,
-                 'LRA High': LRAHigh}
-    return statsDict
+    proc = pexpect.spawn(ffcmd, ffargs)
+    ffLine = proc.readline()
+    while ffLine:
+        parseFF128line(ffLine, dbRow)
+        ffLine = proc.readline()
+    return ff128success(dbRow)
+
+
+def ff128success(dbRow):
+    if dbRow.peakdbfs > -1000.0:
+        return True
+    else:
+        return False
+
+
+def parseFF128line(lineText, dbRow):
+    i = lineText.split()
+    commitDB = True
+    if 'Parsed_ebur128_0' in lineText and 'Summary' not in lineText:
+        dbRow.ilufs = float(i[i.index('I:') + 1])
+        dbRow.lra = float(i[i.index('LRA:') + 1])
+        mIndex = lineText.index('M:')
+        sIndex = lineText.index('S:')
+        dbRow.momentarylufs.append(float(lineText[mIndex + 2: mIndex + 9]))
+        dbRow.shorttermlufs.append(float(lineText[sIndex + 2: sIndex + 9]))
+    elif 'Duration:' in lineText:
+        durationString = i[i.index('Duration:') + 1][:-1]
+        dbRow.duration = durationStringToFloat(durationString)
+    elif 'Threshold:' in lineText:
+        if dbRow.ithresh:
+            dbRow.lrathresh = float(i[i.index('Threshold:') + 1])
+        else:
+            dbRow.ithresh = float(i[i.index('Threshold:') + 1])
+    elif 'LRA low:' in lineText:
+        dbRow.lralow = float(i[i.index('low:') + 1])
+    elif 'LRA high:' in lineText:
+        dbRow.lrahigh = float(i[i.index('high:') + 1])
+    elif 'Peak:' in i and 'dBFS' in i:
+        dbRow.peakdbfs = float(i[i.index('Peak:') + 1])
+    else:
+        commitDB = False
+    if commitDB:
+        session.commit()
+
+
+def durationStringToFloat(durationString):
+    hrsMinsSecs = durationString.split(':')
+    durationFloat = float(hrsMinsSecs[2])
+    durationFloat += int(hrsMinsSecs[1]) * 60
+    durationFloat += int(hrsMinsSecs[0]) * 3600
+    return durationFloat
 
 
 def linearGain(iLUFS, goalLUFS=-23):
@@ -84,7 +130,11 @@ def ffApplyGain(inPath, outPath, linearAmount):
     if outPath[-4:].lower() == '.mp3':
         ffargs += ['-acodec', 'libmp3lame', '-aq', '0']
     ffargs += [outPath]
-    return subprocess.call(ffargs)
+    try:
+        subprocess.Popen(ffargs, stderr=subprocess.PIPE)
+    except:
+        return False
+    return True
 
 
 def createDBTable():
@@ -114,12 +164,16 @@ def jsonstatus(id):
         jsonDict = {'id': audioRow.id}
         jsonDict['originalname'] = audioRow.originalname
         jsonDict['outpath'] = audioRow.outpath
+        jsonDict['duration'] = audioRow.duration
         jsonDict['ilufs'] = audioRow.ilufs
         jsonDict['ithresh'] = audioRow.ithresh
         jsonDict['lra'] = audioRow.lra
         jsonDict['lrathresh'] = audioRow.lrathresh
         jsonDict['lrahigh'] = audioRow.lrahigh
         jsonDict['lralow'] = audioRow.lralow
+        jsonDict['momentarylufs'] = audioRow.momentarylufs
+        jsonDict['shorttermlufs'] = audioRow.shorttermlufs
+        jsonDict['peakdbfs'] = audioRow.peakdbfs
         jsonDict['status'] = audioRow.status
         if audioRow.ilufs:
             jsonDict['gainapplied'] = "{0:.1f}".format(-(audioRow.ilufs + 23))
